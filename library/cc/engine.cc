@@ -6,22 +6,25 @@
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level)
-    : engine_(engine), terminated_(false) {
-  run_engine(this->engine_, configuration.c_str(), logLevelToString(log_level).c_str());
+Engine::Engine(envoy_engine_t engine) : engine_(engine), terminated_(false) {}
 
-  this->stream_client_ = std::make_shared<StreamClient>(this->engine_);
-  this->pulse_client_ = std::make_shared<PulseClient>();
-}
-
-Engine::~Engine() {
-  if (!this->terminated_) {
-    terminate_engine(this->engine_);
+// we lazily construct the stream and pulse clients
+// because they either require or will require a weak ptr
+// which can't be provided from inside of the constructor
+// because of how std::enable_shared_from_this works
+StreamClientSharedPtr Engine::streamClient() {
+  if (!this->stream_client_) {
+    this->stream_client_ = std::make_shared<StreamClient>(this->weak_from_this());
   }
+  return this->stream_client_;
 }
 
-StreamClientSharedPtr Engine::streamClient() { return this->stream_client_; }
-PulseClientSharedPtr Engine::pulseClient() { return this->pulse_client_; }
+PulseClientSharedPtr Engine::pulseClient() {
+  if (!this->pulse_client_) {
+    this->pulse_client_ = std::make_shared<PulseClient>();
+  }
+  return this->pulse_client_;
+}
 
 void Engine::terminate() {
   if (this->terminated_) {
