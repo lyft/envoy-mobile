@@ -1,21 +1,10 @@
-load("@rules_python//python:defs.bzl", "py_binary")
-load("@rules_python//python:packaging.bzl", "py_wheel")
+load("@pip//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@python_abi//:abi.bzl", "python_abi")
+load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:packaging.bzl", "py_wheel")
 
 licenses(["notice"])  # Apache 2
-
-py_binary(
-    name = "e2e_test",
-    srcs = ["e2e_test.py"],
-    data = [
-        ":envoy_engine.so",
-    ],
-    main = "e2e_test.py",
-    deps = [
-        "//library/python/gevent_util",
-    ],
-)
 
 pybind_library(
     name = "envoy_engine_lib",
@@ -51,16 +40,31 @@ pybind_extension(
     ],
 )
 
+py_library(
+    name = "envoy_requests",
+    srcs = glob([
+        "envoy_requests/**/*.py",
+    ]),
+    data = [
+        ":envoy_engine.so",
+    ],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("gevent"),
+    ],
+)
+
 py_wheel(
-    name = "envoy_engine_whl",
+    name = "envoy_requests_whl",
     abi = python_abi(),
-    distribution = "envoy_engine",
+    distribution = "envoy_requests",
     platform = select({
         # TODO: build these on target platforms / architectures to verify
         # that this select statement is correct
-        "//bazel:darwin_arm64": "macos_10_9_aarch64",
-        "//bazel:darwin_x86_64": "macos_10_9_x86_64",
-        "//bazel:darwin": "macos_10_9_x86_64",
+        "//bazel:darwin_arm64": "macosx_10_9_aarch64",
+        "//bazel:darwin_x86_64": "macosx_10_9_x86_64",
+        "//bazel:darwin": "macosx_10_9_x86_64",
         "//bazel:linux_aarch64": "manylinux2014_aarch64",
         "//bazel:linux_x86_64": "manylinux2014_x86_64",
     }),
@@ -69,5 +73,6 @@ py_wheel(
     version = "0.0.1",
     deps = [
         ":envoy_engine.so",
+        ":envoy_requests",
     ],
 )
